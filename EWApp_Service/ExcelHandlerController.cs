@@ -30,6 +30,7 @@ using System.Web.UI.WebControls;
 using System.Collections.Specialized;
 using System.Web.Http.Cors;
 using ExcelDataReader;
+using System.Configuration;
 
 namespace EWApp_Service
 {
@@ -39,6 +40,25 @@ namespace EWApp_Service
         //creating object of datatable present on clientside
         static private System.Data.DataTable dt = new System.Data.DataTable();
         static XElement xelement;
+        static string LogFileName = "Logs.txt";
+
+        public static bool WriteLog(string strFileName, string strMessage)
+        {
+            try
+            {
+                FileStream objFilestream = new FileStream(string.Format("{0}\\{1}", ConfigurationManager.AppSettings["DBLocation"], strFileName), FileMode.Append, FileAccess.Write);
+                StreamWriter objStreamWriter = new StreamWriter((Stream)objFilestream);
+                objStreamWriter.WriteLine(strMessage);
+                objStreamWriter.Close();
+                objFilestream.Close();
+                return true;
+            }
+            catch (Exception ex)
+            {
+
+                return false;
+            }
+        }
 
         public String GetString(Int32 id)
         {
@@ -48,9 +68,10 @@ namespace EWApp_Service
         [EnableCors(origins: "http://127.0.0.1:5500", headers: "*", methods: "*")]
         public string GetAllFiles()
         {
+            try { 
             List<string> files = new List<string>();  
             Dictionary<string, string[]> rawJsonData = new Dictionary<string, string[]>();
-            string[] allfiles = Directory.GetDirectories("D:\\EW-WEB\\EWApp\\bin\\AllFiles\\", "*", SearchOption.AllDirectories);
+            string[] allfiles = Directory.GetDirectories(ConfigurationManager.AppSettings["DBLocation"], "*", SearchOption.AllDirectories);
 
             foreach (string folderName in allfiles)
             {
@@ -65,14 +86,28 @@ namespace EWApp_Service
             rawJsonData.Add("FileName", files.ToArray() );
             var json = JsonConvert.SerializeObject(rawJsonData);
 
-            //json = "{ \"FileName\" : "+ json + "}";
+                //json = "{ \"FileName\" : "+ json + "}";
+
+            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, "Clicked On Load File Button" ));
             return json;
+
+
+            
+            }catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now," Clicked On Load File Button Error: "+ex.Message ));
+                return ex.Message;
+            }
         }
 
         public String GetExcelData(string fileName)
         {
-            string filePath = $@"D:\EW-WEB\EWApp\bin\AllFiles\\{fileName}\{fileName}.xlsx";
-           
+            try
+            {
+
+            
+            string filePath = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}.xlsx";
+
             //opning selected excel file in background 
             Excel.Application app = new Excel.Application();
             Excel.Workbook xlWorkbook = app.Workbooks.Open(filePath,ReadOnly:true);
@@ -118,7 +153,7 @@ namespace EWApp_Service
             ExcelDataAsjson.Add("ExcelData",ExcelData);
             var json = JsonConvert.SerializeObject(ExcelDataAsjson);
 
-            string XMLdirectory = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\"+fileName+"\\"+fileName+"_setting.xml";
+            string XMLdirectory = $"{ConfigurationManager.AppSettings["DBLocation"]}+{fileName}+\\+{fileName}+_setting.xml";
 
             if (!File.Exists(XMLdirectory) )
             {
@@ -139,7 +174,15 @@ namespace EWApp_Service
 
             //closing the imported file..after fetching data from it.
             xlWorkbook.Close(true);
-            return json;
+
+                WriteLog(LogFileName, String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop"));
+                return json;
+            
+            }catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ ex.Message));
+                return ex.Message;
+            }
         }
 
 
@@ -148,12 +191,17 @@ namespace EWApp_Service
         [HttpGet]
         public String NewGetExcelData(string fileName)
         {
+            try
+            {
+
+            
            // Dictionary<string, System.Data.DataTable > XlData = new Dictionary<string, System.Data.DataTable>();
           //  Dictionary<string, string[][]> XlData = new Dictionary<string, string[][]>();
-            string filePath = $@"D:\EW-WEB\EWApp\bin\AllFiles\\{fileName}\{fileName}.xlsx";
-         
+            string filePath = $"{ ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}.xlsx";
+            
+
             DataSet result = null;
-           // List<string[][]> ts = new List<string[][]>();
+            //List<string[][]> ts = new List<string[][]>();
 
             //https://reposhub.com/dotnet/office/ExcelDataReader-ExcelDataReader.html
             using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
@@ -168,14 +216,10 @@ namespace EWApp_Service
                 }
             }
             System.Data.DataTable dt = result.Tables[0];
-            string json = JsonConvert.SerializeObject(result.Tables[0], Newtonsoft.Json.Formatting.Indented);
-
-
             string[] columnNames = (from string x in dt.Rows[0].ItemArray select x.ToString()).ToArray();
-                                    
-
-                //string[] columnNames = (string[])dt.Rows[0].ItemArray[0];
-             /* foreach (System.Data.DataTable table in result.Tables)
+            string json = JsonConvert.SerializeObject(result.Tables[0], Newtonsoft.Json.Formatting.Indented);
+   
+              /*foreach (System.Data.DataTable table in result.Tables)
               {
                   *//*if (//my conditions)
                   {
@@ -183,8 +227,8 @@ namespace EWApp_Service
                   }*//*
                   var rows = table.AsEnumerable().ToArray();
 
-                  //var dataTable = new string[table.Rows.Count][];//[table.Rows[0].ItemArray.Length];
-                  Dictionary<string, string[]> dataTable = new Dictionary<string, string[]>;
+                  var dataTable = new string[table.Rows.Count][];//[table.Rows[0].ItemArray.Length];
+                  //Dictionary<string, string[]> dataTable = new Dictionary<string, string[]>;
                   Parallel.For(0, rows.Length, new ParallelOptions { MaxDegreeOfParallelism = 8 },
                       i =>
                       {
@@ -192,9 +236,10 @@ namespace EWApp_Service
                           dataTable[i] = row.ItemArray.Select(x => x.ToString()).ToArray();
                       });
 
-                  XlData.Add("XlData", dataTable);
-                  //only for one table
-                  break;
+
+                  ts.Add(dataTable);
+                  
+               
               }*/
 
              //var json = JsonConvert.SerializeObject(XlData);
@@ -226,7 +271,7 @@ namespace EWApp_Service
              ////Convert DataTable to Json Format
              //var res = serializer.Serialize(rows);
 
-             string XMLdirectory = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\" + fileName + "\\" + fileName + "_setting.xml";
+             string XMLdirectory = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}_setting.xml";
 
             if (!File.Exists(XMLdirectory))
             {
@@ -243,19 +288,103 @@ namespace EWApp_Service
                 doc.Save(XMLdirectory);
             }
 
-            //Dictionary<string, Dictionary<string, Boolean> > XMLData = ReadXML(XMLdirectory);
+                //Dictionary<string, Dictionary<string, Boolean> > XMLData = ReadXML(XMLdirectory);
 
-            //closing the imported file..after fetching data from it.
+                //closing the imported file..after fetching data from it.
+
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName} ,Method: ExcelDataReader "));
+                return json;
             
-            return json;
+            }catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ex.Message));
+                return ex.Message;
+            }
+        }
+
+        [HttpGet]
+        public String MultiNewGetExcelData(string fileName)
+        {
+            try
+            {
+
+            
+            string filePath = $"{ ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}.xlsx";
+
+
+            DataSet result = null;
+            List<System.Data.DataTable> worksheetsList = new List<System.Data.DataTable>();
+
+            //https://reposhub.com/dotnet/office/ExcelDataReader-ExcelDataReader.html
+            using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+            {
+                // Auto-detect format, supports:
+                //  - Binary Excel files (2.0-2003 format; *.xls)
+                //  - OpenXml Excel files (2007 format; *.xlsx)
+                using (var reader = ExcelReaderFactory.CreateReader(stream))
+                {
+                    result = reader.AsDataSet();
+
+                }
+            }
+            
+            List<string[]> colNamesList = new List<string[]>();
+
+            foreach (System.Data.DataTable table in result.Tables)
+            {
+                System.Data.DataTable dt = table;
+                string[] columnNames = (from string x in dt.Rows[0].ItemArray select x.ToString()).ToArray();
+                colNamesList.Add(columnNames);
+                worksheetsList.Add(table);
+            }
+            var json = JsonConvert.SerializeObject(worksheetsList);
+
+            // XlData.Add("XlData", result.Tables[0]);
+            // string json = JsonConvert.SerializeObject(XlData, Newtonsoft.Json.Formatting.Indented);
+
+
+            string XMLdirectory = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}_setting.xml";
+
+                /*if (!File.Exists(XMLdirectory))
+                {
+                    //creating XML file for imported file
+                    XDocument doc = new XDocument(new XElement("SettingGroup"));
+
+                    foreach (string[] columnNames in colNamesList)
+                    {
+
+                        foreach (string colName in columnNames)
+                        {
+                            doc.Element("SettingGroup").Add(new XElement(colName.Replace(" ", "_"), new XAttribute("colName", colName.ToString())
+                                                                                  , new XAttribute("ReadOnly", false)
+                                                                                  , new XAttribute("Hidden", false)
+                                                            ));
+                        }               
+                    }
+                    doc.Save(XMLdirectory);
+                }*/
+
+                //Dictionary<string, Dictionary<string, Boolean> > XMLData = ReadXML(XMLdirectory);
+
+                //closing the imported file..after fetching data from it.
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExceDataReader Error:"));
+                return json;
+            }catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExcelDataReader Error: "+ ex.Message));
+                return ex.Message;
+            }
         }
 
 
         [HttpGet]
         public string ReadXML(string fileName)
         {
-            string xmlfilePath = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\"+fileName+"\\"+fileName+"_setting.xml";
+            try
+            {
 
+            
+            string xmlfilePath =$"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}_setting.xml";
             xelement = XElement.Load(xmlfilePath);
             IEnumerable<XElement> settingGroup = xelement.Elements();
             // Excel.Worksheet ws = Globals.ThisWorkbook.Worksheets[1];
@@ -283,7 +412,14 @@ namespace EWApp_Service
             Dictionary<string, Dictionary<string, Dictionary<string, Boolean>>> jsonXMLData = new Dictionary<string, Dictionary<string, Dictionary<string, Boolean>>>();
             jsonXMLData.Add("XMLData",XMLData);
             var json = JsonConvert.SerializeObject(jsonXMLData);
-            return json;
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting"));
+                return json;
+            }
+            catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting, Error: "+ ex.Message));
+                return ex.Message;
+            }
         }
 
 
@@ -291,11 +427,21 @@ namespace EWApp_Service
         [HttpGet]
         public string GetFileName(string key)
         {
+            try
+            {
+            string XMLdirectory = $"{ConfigurationManager.AppSettings["DBLocation"]}Entries.xml";
+            if (!File.Exists(XMLdirectory))
+            {
+                //creating XML file for imported file
+                XDocument docm = new XDocument(new XElement("Users"));
+                docm.Save(XMLdirectory);
+            }
+
             string fileName=string.Empty;
-            string XMLdirectory = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\Entries.xml";
+            
             XmlDocument doc = new XmlDocument();
             doc.Load(XMLdirectory);
-           // xelement = XElement.Load(XMLdirectory);
+            // xelement = XElement.Load(XMLdirectory);
             XmlNode node = doc.DocumentElement.SelectSingleNode($"//{key}");
             if(node != null)
             {
@@ -303,11 +449,18 @@ namespace EWApp_Service
                 doc.DocumentElement.RemoveChild(node);
             }
             
-           doc.Save(XMLdirectory);
+            doc.Save(XMLdirectory);
 
-            /*var xel = AllUsers.Descendants("param")
-              .Where(xElement => xElement.Attribute("name")?.Value == "Super");*/
-            return fileName;
+                /*var xel = AllUsers.Descendants("param")
+                  .Where(xElement => xElement.Attribute("name")?.Value == "Super");*/
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}"));
+                return fileName;
+            }
+            catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}, Error: "+ ex.Message));
+                return ex.Message;
+            }
         }
 
 
@@ -318,9 +471,9 @@ namespace EWApp_Service
         {
             try
             {
-                var name = fileName;
+                //var name = fileName;
               
-                string XMLdirectory = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\Entries.xml";
+                string XMLdirectory = $"{ConfigurationManager.AppSettings["DBLocation"]}Entries.xml";
 
                 if (!File.Exists(XMLdirectory))
                 {
@@ -339,11 +492,12 @@ namespace EWApp_Service
                     xDocument.Element("Users").Add(new XElement($"user{fileName[0]}", new XAttribute("fileName", fileName[1])));
                     xDocument.Save(XMLdirectory);
                 }
-
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName{fileName[1]} And Key:{fileName[0]} (Web-request)"));
                 return Request.CreateResponse<string>("Saved");
             }
             catch (Exception ex)
             {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName:{fileName[1]} And Key:{fileName[0]}, Error: "+ ex.Message));
                 return Request.CreateResponse<string>(ex.ToString());
             }
             
@@ -354,9 +508,14 @@ namespace EWApp_Service
         [Route("/ExcelHandler/SaveXML")]
         public async Task<HttpResponseMessage> SaveXML(List<Object> li)
         {
+            try
+            {
+
+            
             //Console.WriteLine(li);
             string fileName= li[0].ToString();
-            string xmlfilePath = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\"+fileName+"\\"+fileName+"_setting.xml";
+            string xmlfilePath = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}_setting.xml";
+
             xelement = XElement.Load(xmlfilePath);
             IEnumerable<XElement> settingGroup = xelement.Elements();
 
@@ -375,8 +534,15 @@ namespace EWApp_Service
             }
 
             xelement.Save(xmlfilePath);
+            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{fileName}_setting"));
 
             return Request.CreateResponse<string>("Saved");
+            
+            }catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{li[0]}_setting Error: "+ ex.Message));
+                return Request.CreateResponse<string>(ex.Message);
+            }
         }
 
 
@@ -384,6 +550,9 @@ namespace EWApp_Service
         [Route("/ExcelHandler/HandleNewFile")]
         public async Task<HttpResponseMessage> HandleNewFile()
         {
+            try
+            {
+            
             if (!Request.Content.IsMimeMultipartContent())
             {
                 throw new HttpResponseException(HttpStatusCode.UnsupportedMediaType);
@@ -413,9 +582,9 @@ namespace EWApp_Service
             /*if (formData["ClientDocs"] == "ClientDocs")
             {*/
                // var path = HttpRuntime.AppDomainAppPath;
-            directoryName = "D:\\EW-WEB\\EWApp\\bin\\AllFiles\\"+fileName;
+            directoryName = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}";
             // directoryName = System.IO.Path.Combine(path, "ClientDocument");
-           // filename = System.IO.Path.Combine(directoryName, fileName);
+            // filename = System.IO.Path.Combine(directoryName, fileName);
             filename = directoryName+"\\"+fileName+".xlsx";
 
                 //Detecting exists file  
@@ -444,11 +613,16 @@ namespace EWApp_Service
 
             var response = Request.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("DocsUrl", URL);
-            //return response;
+                //return response;
 
 
-
+            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Importing New File{filename}"));
             return Request.CreateResponse<string>("Success");
+            }catch (Exception ex)
+            {
+            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, "Importing New File Error: "+ ex.Message));
+            return Request.CreateResponse<string>(ex.Message);
+            }
         }
 
 
@@ -460,7 +634,7 @@ namespace EWApp_Service
             {
                 var sd = ExcelData;
                 string fileName = ExcelData["FileName"][0];
-                string filePath = $@"D:\EW-WEB\EWApp\bin\AllFiles\{fileName}\{fileName}.xlsx";
+                string filePath = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}.xlsx";
 
                 Excel.Application app = new Excel.Application();
                 Excel.Workbook xlWorkbook = app.Workbooks.Open(filePath);
@@ -489,7 +663,7 @@ namespace EWApp_Service
                 }
 
                 //app.DisplayAlerts = false;
-                string tempPath = $@"D:\EW-WEB\EWApp\bin\AllFiles\{fileName}\{fileName}.xlsx";
+                string tempPath = $"{ConfigurationManager.AppSettings["DBLocation"]}{fileName}\\{fileName}.xlsx";
                 //  if (File.Exists(filePath)) File.Delete(filePath);
                 // xlWorkbook.SaveAs(filePath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookDefault, Type.Missing, Type.Missing, Type.Missing, Type.Missing, XlSaveAsAccessMode.xlNoChange, XlSaveConflictResolution.xlLocalSessionChanges, Type.Missing, Type.Missing);
 
@@ -500,10 +674,11 @@ namespace EWApp_Service
                 xlWorkbook.Close();
                 app.Quit();
 
-
-                return Request.CreateResponse<string>("Success");
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{fileName}"));
+                return Request.CreateResponse<string>("Data Saved Successfully");
             }catch (Exception ex)
             {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{ExcelData["FileName"][0]} Error: "+ ex.Message));
                 return Request.CreateResponse<string>(ex.ToString());
             }
         }
@@ -516,17 +691,38 @@ namespace EWApp_Service
         {
             try
             {
-                string filePath = $@"D:\EW-WEB\EWApp\bin\AllFiles\\{fileName}"; 
+                string filePath = $"{ConfigurationManager.AppSettings["DBLocation"]}\\{fileName}"; 
                 if (Directory.Exists(filePath))
                 {
                     Directory.Delete(filePath, true);
                     return Request.CreateResponse<string>("Deleted");
                 }
 
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName}" ));
                 return Request.CreateResponse<string>("Success");
             }
             catch (Exception ex)
             {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName} , Error: "+ ex.Message));
+                return Request.CreateResponse<string>(ex.ToString());
+            }
+        }
+
+
+        [HttpPost]
+        [Route("/ExcelHandler/HandleClientLogs")]
+        [EnableCors(origins: "http://127.0.0.1:5500", headers: "*", methods: "*")]
+        public async Task<HttpResponseMessage> HandleClientLogs([FromBody] string fileName)
+        {
+            try
+            {
+                var errStr = Request.Content.ReadAsStringAsync().Result;
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, errStr.ToString()));
+                return Request.CreateResponse<string>("Success");
+            }
+            catch (Exception ex)
+            {
+                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Logging ClientSideError , Error: " + ex.Message));
                 return Request.CreateResponse<string>(ex.ToString());
             }
         }
