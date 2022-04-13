@@ -25,7 +25,7 @@ using System.Net;
 using Newtonsoft.Json;
 using System.Web;
 using System.Web.Configuration;
-using System.Web.UI;
+using System.Diagnostics;
 using System.Web.UI.WebControls;
 using System.Collections.Specialized;
 using System.Web.Http.Cors;
@@ -36,13 +36,42 @@ namespace EWApp_Service
 {
     public class ExcelHandlerController : ApiController
     {
-        
+
+
         //creating object of datatable present on clientside
         static private System.Data.DataTable dt = new System.Data.DataTable();
         static XElement xelement;
         static string LogFileName = "Logs.txt";
+        static  ILogger log;
+        static ExcelHandlerController()
+        {
+            try
+            {
+            /*if (ConfigurationManager.AppSettings["LogType"]=="EventLogger")
+             {
+                  log = new EventLogger();
+             }
+            else
+            {
+                  log = new FileLogger();
+            }*/
 
-        public static bool WriteLog(string strFileName, string strMessage)
+            string str = ConfigurationManager.AppSettings["LogType"];
+            Type instanceType = Type.GetType("EWApp_Service."+str);
+            //Type instanceType  = typeof(FileLogger);
+            log = (ILogger)Activator.CreateInstance(instanceType);
+            
+            }
+            catch (Exception ex)
+            {
+                string message = "Failed To Write Log into LogFile Error: " + ex.Message;
+                ILogger Ev = new EventLogger();
+                Ev.WriteLog(String.Format("{0} @ {1}", DateTime.Now, message, EventLogEntryType.Error),EventLogEntryType.Error);
+            }
+
+        }
+
+ /*       public static bool WriteLog(string strFileName, string strMessage)
         {
             try
             {
@@ -51,14 +80,39 @@ namespace EWApp_Service
                 objStreamWriter.WriteLine(strMessage);
                 objStreamWriter.Close();
                 objFilestream.Close();
+               
+
+               
                 return true;
+
             }
             catch (Exception ex)
             {
+                string message = "Failed To Write Log into LogFile Error: "+ex.Message;
+                *//*if (!EventLog.SourceExists("EWApp"))
+                {
+                    EventLog.CreateEventSource("EWApp", "EWLog");
+                    EventLog log = new EventLog("EWLog");
+                    log.Source = "EWApp";
+                    log.WriteEntry(String.Format("{0} @ {1}", DateTime.Now, "LogFile Created "), EventLogEntryType.Information);
+                }
+                else
+                {
+                    EventLog log = new EventLog("EWLog");
+                    log.Source = "EWApp";
+                    log.WriteEntry(String.Format("{0} @ {1}", DateTime.Now, "Failed To Write Log into LogFile,  Error: " + ex.Message), EventLogEntryType.Error);
+                }*//*
+
+                
+                using (EventLog eventLog = new EventLog("Application"))
+                {
+                    eventLog.Source = "Application";
+                    eventLog.WriteEntry(String.Format("{0} @ {1}", DateTime.Now, message  ), EventLogEntryType.Error);
+                }
 
                 return false;
             }
-        }
+        }*/
 
         public String GetString(Int32 id)
         {
@@ -88,14 +142,14 @@ namespace EWApp_Service
 
                 //json = "{ \"FileName\" : "+ json + "}";
 
-            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, "Clicked On Load File Button" ));
+            log.WriteLog(String.Format("{0} @ {1}", DateTime.Now, "Clicked On Load File Button" ), EventLogEntryType.Information);
             return json;
 
 
             
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now," Clicked On Load File Button Error: "+ex.Message ));
+                log.WriteLog(String.Format("{0} @ {1}", DateTime.Now," Clicked On Load File Button Error: "+ex.Message ), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -175,12 +229,12 @@ namespace EWApp_Service
             //closing the imported file..after fetching data from it.
             xlWorkbook.Close(true);
 
-                WriteLog(LogFileName, String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop"));
+                log.WriteLog( String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop"), EventLogEntryType.Information);
                 return json;
             
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}",  DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ ex.Message), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -292,12 +346,12 @@ namespace EWApp_Service
 
                 //closing the imported file..after fetching data from it.
 
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName} ,Method: ExcelDataReader "));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName} ,Method: ExcelDataReader "), EventLogEntryType.Information);
                 return json;
             
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ex.Message));
+                log.WriteLog(String.Format("{0} @ {1}", DateTime.Now, $"Getting Excel Data FileName:{fileName}, Method: MSXlInterop Error: "+ex.Message), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -367,11 +421,11 @@ namespace EWApp_Service
                 //Dictionary<string, Dictionary<string, Boolean> > XMLData = ReadXML(XMLdirectory);
 
                 //closing the imported file..after fetching data from it.
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExceDataReader Error:"));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExceDataReader Error:"), EventLogEntryType.Information);
                 return json;
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExcelDataReader Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Getting Multi-Sheets Excel Data FileName:{fileName}, Method: ExcelDataReader Error: "+ ex.Message), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -412,12 +466,12 @@ namespace EWApp_Service
             Dictionary<string, Dictionary<string, Dictionary<string, Boolean>>> jsonXMLData = new Dictionary<string, Dictionary<string, Dictionary<string, Boolean>>>();
             jsonXMLData.Add("XMLData",XMLData);
             var json = JsonConvert.SerializeObject(jsonXMLData);
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting"));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting"), EventLogEntryType.Information);
                 return json;
             }
             catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting, Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Reading Xml Data FileName:{fileName}_setting, Error: "+ ex.Message), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -453,12 +507,12 @@ namespace EWApp_Service
 
                 /*var xel = AllUsers.Descendants("param")
                   .Where(xElement => xElement.Attribute("name")?.Value == "Super");*/
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}"));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}"), EventLogEntryType.Information);
                 return fileName;
             }
             catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}, Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Getting FileName corresponds to Key: {key}, Error: "+ ex.Message), EventLogEntryType.Error);
                 return ex.Message;
             }
         }
@@ -492,12 +546,12 @@ namespace EWApp_Service
                     xDocument.Element("Users").Add(new XElement($"user{fileName[0]}", new XAttribute("fileName", fileName[1])));
                     xDocument.Save(XMLdirectory);
                 }
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName{fileName[1]} And Key:{fileName[0]} (Web-request)"));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName{fileName[1]} And Key:{fileName[0]} (Web-request)"), EventLogEntryType.Information);
                 return Request.CreateResponse<string>("Saved");
             }
             catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName:{fileName[1]} And Key:{fileName[0]}, Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Stroring FileName:{fileName[1]} And Key:{fileName[0]}, Error: "+ ex.Message), EventLogEntryType.Error);
                 return Request.CreateResponse<string>(ex.ToString());
             }
             
@@ -534,13 +588,13 @@ namespace EWApp_Service
             }
 
             xelement.Save(xmlfilePath);
-            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{fileName}_setting"));
+            log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{fileName}_setting"), EventLogEntryType.Information);
 
             return Request.CreateResponse<string>("Saved");
             
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{li[0]}_setting Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Saving XML:{li[0]}_setting Error: "+ ex.Message), EventLogEntryType.Error);
                 return Request.CreateResponse<string>(ex.Message);
             }
         }
@@ -616,11 +670,11 @@ namespace EWApp_Service
                 //return response;
 
 
-            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Importing New File{filename}"));
+            log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Importing New File{filename}"), EventLogEntryType.Information);
             return Request.CreateResponse<string>("Success");
             }catch (Exception ex)
             {
-            WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, "Importing New File Error: "+ ex.Message));
+            log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, "Importing New File Error: "+ ex.Message), EventLogEntryType.Error);
             return Request.CreateResponse<string>(ex.Message);
             }
         }
@@ -674,11 +728,11 @@ namespace EWApp_Service
                 xlWorkbook.Close();
                 app.Quit();
 
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{fileName}"));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{fileName}"), EventLogEntryType.Information);
                 return Request.CreateResponse<string>("Data Saved Successfully");
             }catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{ExcelData["FileName"][0]} Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Saving Excel Data FileName:{ExcelData["FileName"][0]} Error: "+ ex.Message), EventLogEntryType.Error);
                 return Request.CreateResponse<string>(ex.ToString());
             }
         }
@@ -698,12 +752,12 @@ namespace EWApp_Service
                     return Request.CreateResponse<string>("Deleted");
                 }
 
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName}" ));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName}" ), EventLogEntryType.Information);
                 return Request.CreateResponse<string>("Success");
             }
             catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName} , Error: "+ ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Deleting File(Web-request) FileName:{fileName} , Error: "+ ex.Message), EventLogEntryType.Error);
                 return Request.CreateResponse<string>(ex.ToString());
             }
         }
@@ -717,12 +771,12 @@ namespace EWApp_Service
             try
             {
                 var errStr = Request.Content.ReadAsStringAsync().Result;
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, errStr.ToString()));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, errStr.ToString()), EventLogEntryType.Error);
                 return Request.CreateResponse<string>("Success");
             }
             catch (Exception ex)
             {
-                WriteLog(LogFileName, String.Format("{0} @ {1}", DateTime.Now, $"Logging ClientSideError , Error: " + ex.Message));
+                log.WriteLog( String.Format("{0} @ {1}", DateTime.Now, $"Logging ClientSideError , Error: " + ex.Message), EventLogEntryType.Error);
                 return Request.CreateResponse<string>(ex.ToString());
             }
         }
